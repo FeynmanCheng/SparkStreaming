@@ -1,4 +1,10 @@
 public class HostHot {
-    int hot;
+
     String name;
+    String knownAS;
+    int uid;
+    int rid;
+    int hot;
+    String live_desc;
+    String cate;
 }
