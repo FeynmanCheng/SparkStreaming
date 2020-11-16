@@ -5,7 +5,6 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import org.apache.spark.SparkConf;
-import org.apache.spark.sql.SparkSession;
 import org.apache.spark.streaming.*;
 import org.apache.spark.streaming.api.java.*;
 
@@ -25,7 +24,7 @@ public final class HotCount {
 //                .getOrCreate();
 
 //        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
-        SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("HotCount");
+        SparkConf conf = new SparkConf().setMaster("local[2]").setAppName("HotCount");
         JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(10));
 
         JavaDStream<String> files = jssc.textFileStream("hdfs://172.19.241.159:9000/user/hadoop/test");
