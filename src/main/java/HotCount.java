@@ -3,9 +3,10 @@ import com.alibaba.fastjson.JSONObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import org.apache.spark.HashPartitioner;
 import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.streaming.*;
 import org.apache.spark.streaming.api.java.*;
 
@@ -28,6 +29,46 @@ public final class HotCount {
             JSONObject object = JSON.parseObject(rdd);
             return new Tuple2<>(object.getString("cate"),object.getInteger("hot"));
         });
+        JavaPairDStream<String,Tuple2<String,Integer>> cates = lines.mapToPair(rdd->{
+            JSONObject object = JSON.parseObject(rdd);
+            Tuple2<String,Integer> host_hot = new Tuple2<>(object.getString("name"),object.getInteger("hot"));
+            return new Tuple2<>(object.getString("cate"),host_hot);
+        });
+        JavaPairDStream<String,List<Tuple2<String,Integer>>> cate_host_hot = cates.combineByKey(new Function<Tuple2<String, Integer>, List<Tuple2<String, Integer>>>() {
+            @Override
+            public List<Tuple2<String, Integer>> call(Tuple2<String, Integer> stringIntegerTuple2) throws Exception {
+                List<Tuple2<String, Integer>> list = new LinkedList<>();
+                list.add(stringIntegerTuple2);
+                return list;
+            }
+        }, new Function2<List<Tuple2<String, Integer>>, Tuple2<String, Integer>, List<Tuple2<String, Integer>>>() {
+            @Override
+            public List<Tuple2<String, Integer>> call(List<Tuple2<String, Integer>> tuple2s, Tuple2<String, Integer> stringIntegerTuple2) throws Exception {
+                tuple2s.add(stringIntegerTuple2);
+                return tuple2s;
+            }
+        }, new Function2<List<Tuple2<String, Integer>>, List<Tuple2<String, Integer>>, List<Tuple2<String, Integer>>>() {
+            @Override
+            public List<Tuple2<String, Integer>> call(List<Tuple2<String, Integer>> tuple2s, List<Tuple2<String, Integer>> tuple2s2) throws Exception {
+                tuple2s.addAll(tuple2s2);
+                return tuple2s;
+            }
+        },new HashPartitioner(2));
+        JavaDStream<CateHostHot> cate_top_hot = cate_host_hot.map(new Function<Tuple2<String, List<Tuple2<String, Integer>>>, CateHostHot>() {
+            @Override
+            public CateHostHot call(Tuple2<String, List<Tuple2<String, Integer>>> stringListTuple2) throws Exception {
+                List<MyTuple2> top10 = new LinkedList<>();
+                List<Tuple2<String, Integer>> all = stringListTuple2._2;
+                all.sort((o1, o2) -> o2._2 - o1._2);
+                for (int i=0;i<10&& i<all.size();i++){
+                    top10.add(new MyTuple2(all.get(i)));
+                }
+
+                return null;
+            }
+        })
+
+
         JavaPairDStream<String,Integer> curHot = hosts.reduceByKey(Integer::sum);
 
         JavaDStream<MyTuple2> topHot = curHot.map((Function<Tuple2<String, Integer>, MyTuple2>) MyTuple2::new);
