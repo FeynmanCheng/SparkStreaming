@@ -4,6 +4,8 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.function.Function;
 import org.apache.spark.streaming.*;
 import org.apache.spark.streaming.api.java.*;
 
@@ -16,9 +18,9 @@ import java.util.*;
 public final class HotCount {
 
     public static void main(String[] args) throws InterruptedException{
-        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
-//        SparkConf conf = new SparkConf().setMaster("local[2]").setAppName("HotCount");
-        JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(60));
+//        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
+        SparkConf conf = new SparkConf().setMaster("local[2]").setAppName("HotCount");
+        JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(6));
 
         JavaDStream<String> files = jssc.textFileStream("hdfs://172.19.241.159:9000/user/hadoop/test");
         JavaDStream<String> lines = files.flatMap(x -> Arrays.asList(x.split(System.getProperty("line.separator"))).iterator());
@@ -28,13 +30,17 @@ public final class HotCount {
         });
         JavaPairDStream<String,Integer> curHot = hosts.reduceByKey(Integer::sum);
 
-        curHot.foreachRDD(rdd ->{
+        JavaDStream<MyTuple2> topHot = curHot.map((Function<Tuple2<String, Integer>, MyTuple2>) MyTuple2::new);
+        topHot.print(1);
+
+
+        topHot.foreachRDD(rdd ->{
             SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
             String[] parts = df.format(new Date()).split(":");
             String timeStamp = parts[0] + ":" + parts[1];
 //            List<Tuple2<String,Integer>> items = rdd.items(10, (o1, o2) -> o2._2-o1._2);
 //            List<Tuple2<String,Integer>> items = rdd.items(10, CompareHot.getComparator());
-            List<Tuple2<String,Integer>> items = rdd.collect();
+            List<MyTuple2> items = rdd.top(10);
 
             MongoClient client = new MongoClient("172.19.241.171");
             MongoDatabase database = client.getDatabase("hot");
@@ -43,7 +49,7 @@ public final class HotCount {
             if (items.size()>0){
                 List<Document> jsons = new LinkedList<>();
                 items.forEach(t ->{
-                    Document document = new Document("name",t._1).append("hot",t._2);
+                    Document document = new Document("name",t.t._1).append("hot",t.t._2);
                     jsons.add(document);
                 });
 
