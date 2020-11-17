@@ -7,6 +7,8 @@ import org.apache.spark.HashPartitioner;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.broadcast.Broadcast;
+import org.apache.spark.broadcast.TorrentBroadcast;
 import org.apache.spark.streaming.*;
 import org.apache.spark.streaming.api.java.*;
 
@@ -57,18 +59,30 @@ public final class HotCount {
         JavaDStream<CateHostHot> cate_top_hot = cate_host_hot.map(new Function<Tuple2<String, List<Tuple2<String, Integer>>>, CateHostHot>() {
             @Override
             public CateHostHot call(Tuple2<String, List<Tuple2<String, Integer>>> stringListTuple2) throws Exception {
-                List<MyTuple2> top10 = new LinkedList<>();
+                List<Tuple2<String, Integer>> top10 = new LinkedList<>();
                 List<Tuple2<String, Integer>> all = stringListTuple2._2;
                 all.sort((o1, o2) -> o2._2 - o1._2);
                 for (int i=0;i<10&& i<all.size();i++){
-                    top10.add(new MyTuple2(all.get(i)));
+                    top10.add(all.get(i));
                 }
 
-                return null;
+
+                return new CateHostHot(new Tuple2<>(stringListTuple2._1,top10));
             }
-        })
+        });
 
-
+        SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
+        String[] parts = df.format(new Date()).split(":");
+        Broadcast<String> time = jssc.sparkContext().broadcast(parts[0] + ":" + parts[1]);
+        cate_top_hot.foreachRDD(rdd->{
+            rdd.foreach(item->{
+                String timeStamp = time.value();
+                String cateName = item.t._1;
+                MongoCollection<Document> collection = new MongoClient("172.19.241.171").getDatabase("cate_top_host").getCollection(cateName);
+                Document document = new Document("cate",cateName).append("list",item.t._2);
+                collection.insertOne(document);
+            });
+        });
         JavaPairDStream<String,Integer> curHot = hosts.reduceByKey(Integer::sum);
 
         JavaDStream<MyTuple2> topHot = curHot.map((Function<Tuple2<String, Integer>, MyTuple2>) MyTuple2::new);
@@ -76,9 +90,8 @@ public final class HotCount {
 
 
         topHot.foreachRDD(rdd ->{
-            SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
-            String[] parts = df.format(new Date()).split(":");
-            String timeStamp = parts[0] + ":" + parts[1];
+
+            String timeStamp = time.value();
 //            List<Tuple2<String,Integer>> items = rdd.items(10, (o1, o2) -> o2._2-o1._2);
 //            List<Tuple2<String,Integer>> items = rdd.items(10, CompareHot.getComparator());
             List<MyTuple2> items = rdd.top(10);
@@ -101,7 +114,7 @@ public final class HotCount {
             }
 
         });
-
+        time.unpersist();
 
         jssc.start();
         jssc.awaitTermination();
