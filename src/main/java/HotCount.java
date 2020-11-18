@@ -19,8 +19,9 @@ import java.util.*;
 public final class HotCount {
 
     public static void main(String[] args) throws InterruptedException {
-        SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("HotCount");
-        JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(6));
+        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
+//        SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("HotCount");
+        JavaStreamingContext jssc = new JavaStreamingContext(conf, Durations.seconds(60));
 
         JavaDStream<String> files = jssc.textFileStream("hdfs://172.19.241.159:9000/user/hadoop/test");
         JavaDStream<String> files2 = jssc.textFileStream("hdfs://172.19.241.159:9000/user/hadoop/test");
