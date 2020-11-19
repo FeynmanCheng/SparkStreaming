@@ -14,14 +14,10 @@ import org.apache.spark.graphx.Graph;
 import org.apache.spark.graphx.lib.PageRank;
 import org.apache.spark.storage.StorageLevel;
 import org.bson.Document;
-import scala.Int;
 import scala.Tuple2;
-import scala.math.Ordering;
 import scala.reflect.ClassTag;
 
-import javax.print.Doc;
 import java.util.*;
-import java.util.function.Consumer;
 
 public class Neighbour {
     public static void main(String[] args) {
@@ -75,21 +71,21 @@ public class Neighbour {
             Map<Long,String> map = broadcast.getValue();
             if (map.containsKey(room.rid)) {
                 room.hostName = inDegree.get(room.rid);
-                return new Tuple2<>(room.rid, room.hostName);
+
             }
-            return null;
+            return new Tuple2<>(room.rid, room.hostName);
         });
-        vertices = vertices.filter(Objects::nonNull);
-        edges.filter(e->{
-            return broadcast.getValue().containsKey(e.srcId());
-        });
+//        vertices = vertices.filter(Objects::nonNull);
+//        edges.filter(e->{
+//            return broadcast.getValue().containsKey(e.dstId());
+//        });
         System.out.println("Edge num: " + edges.collect().size());
         System.out.println("Vertex num: " + vertices.collect().size());
-        vertices.collect().forEach(System.out::println);
+//        vertices.collect().forEach(System.out::println);
 //        edges.collect().forEach(System.out::println);
         ClassTag<String> stringClassTag = ClassTag.apply(String.class);
         Graph<String,String> graph = Graph.apply(vertices.rdd(),edges.rdd(),"", StorageLevel.MEMORY_ONLY(),StorageLevel.MEMORY_ONLY(),stringClassTag,stringClassTag);
-        Graph<Object,Object> result = PageRank.run(graph,10,0.0001,stringClassTag,stringClassTag);
+        Graph<Object,Object> result = PageRank.run(graph,3,0.001,stringClassTag,stringClassTag);
 //        result.vertices().saveAsTextFile("~/vertex.txt");
         List<Tuple2<Object,Object>> list = new ArrayList<>(result.vertices().toJavaRDD().collect());//返回的List是Arrays的内部类，没有排序等方法，需要新建一个List
         list.sort(new Comparator<Tuple2<Object, Object>>() {
@@ -101,7 +97,15 @@ public class Neighbour {
             }
         });
 
-        list.forEach(System.out::println);
+        list.forEach(item ->{
+            System.out.print(item);
+            if (inDegree.containsKey(item._1)){
+                System.out.println(inDegree.get(item._1));
+            }else {
+                System.out.println();
+
+            }
+        });
 //        result.edges().toJavaRDD().collect().forEach(System.out::println);
 
     }
