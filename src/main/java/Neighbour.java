@@ -64,49 +64,36 @@ public class Neighbour {
             }
         }
 
-        Broadcast<Map<Long,String>> broadcast = context.broadcast(inDegree);
-
         JavaRDD<Edge<String>> edges = context.parallelize(edgeList);
-        JavaRDD<Tuple2<Object,String>> vertices = roomRDDs.map(room-> {
-            Map<Long,String> map = broadcast.getValue();
-            if (map.containsKey(room.rid)) {
-                room.hostName = inDegree.get(room.rid);
+        JavaRDD<Tuple2<Object,String>> vertices = roomRDDs.map(room-> new Tuple2<>(room.rid, room.hostName));
 
-            }
-            return new Tuple2<>(room.rid, room.hostName);
-        });
-//        vertices = vertices.filter(Objects::nonNull);
-//        edges.filter(e->{
-//            return broadcast.getValue().containsKey(e.dstId());
-//        });
         System.out.println("Edge num: " + edges.collect().size());
         System.out.println("Vertex num: " + vertices.collect().size());
-//        vertices.collect().forEach(System.out::println);
-//        edges.collect().forEach(System.out::println);
+
         ClassTag<String> stringClassTag = ClassTag.apply(String.class);
         Graph<String,String> graph = Graph.apply(vertices.rdd(),edges.rdd(),"", StorageLevel.MEMORY_ONLY(),StorageLevel.MEMORY_ONLY(),stringClassTag,stringClassTag);
-        Graph<Object,Object> result = PageRank.run(graph,3,0.001,stringClassTag,stringClassTag);
-//        result.vertices().saveAsTextFile("~/vertex.txt");
+        Graph<Object,Object> result = PageRank.run(graph,1,0.001,stringClassTag,stringClassTag);
+
         List<Tuple2<Object,Object>> list = new ArrayList<>(result.vertices().toJavaRDD().collect());//返回的List是Arrays的内部类，没有排序等方法，需要新建一个List
-        list.sort(new Comparator<Tuple2<Object, Object>>() {
-            @Override
-            public int compare(Tuple2<Object, Object> o1, Tuple2<Object, Object> o2) {
-                Double d1 = (Double) o1._2;
-                Double d2 = (Double) o2._2;
-                return d1.compareTo(d2);
-            }
+        list.sort((o1, o2) -> {
+            Double d1 = (Double) o1._2;
+            Double d2 = (Double) o2._2;
+            return d1.compareTo(d2);
         });
+
+//        List<Document> documents = new LinkedList<>();
 
         list.forEach(item ->{
-            System.out.print(item);
+            System.out.print(item+ " ");
             if (inDegree.containsKey(item._1)){
                 System.out.println(inDegree.get(item._1));
+//                Document document = new Document("rid",item._1).append("name",inDegree.get(item._1)).append("rank",item._2);
+//                documents.add(document);
             }else {
                 System.out.println();
-
             }
         });
-//        result.edges().toJavaRDD().collect().forEach(System.out::println);
-
+//        MongoCollection<Document> output = database.getCollection("rank");
+//        output.insertMany(documents);
     }
 }
