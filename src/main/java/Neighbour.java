@@ -21,7 +21,7 @@ import java.util.*;
 
 public class Neighbour {
     public static void main(String[] args) {
-//        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
+//        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("Graph");
         SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("Graph");
         JavaSparkContext context = new JavaSparkContext(conf);
         MongoClient client = new MongoClient("172.19.241.171");
@@ -65,8 +65,16 @@ public class Neighbour {
         }
 
         JavaRDD<Edge<String>> edges = context.parallelize(edgeList);
-        JavaRDD<Tuple2<Object,String>> vertices = roomRDDs.map(room-> new Tuple2<>(room.rid, room.hostName));
-
+        JavaRDD<Tuple2<Object,String>> vertices = roomRDDs.map(room-> {
+            if (inDegree.containsKey(room.rid)){
+                return new Tuple2<>(room.rid, room.hostName);
+            }
+            return null;
+        });
+        vertices = vertices.filter(Objects::nonNull);
+        edges = edges.filter(e->{
+            return inDegree.containsKey(e.srcId());
+        });
         System.out.println("Edge num: " + edges.collect().size());
         System.out.println("Vertex num: " + vertices.collect().size());
 
