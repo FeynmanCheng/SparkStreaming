@@ -22,7 +22,7 @@ import java.util.*;
 public class Neighbour {
     public static void main(String[] args) {
 //        SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
-        SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("HotCount");
+        SparkConf conf = new SparkConf().setMaster("local[4]").setAppName("Graph");
         JavaSparkContext context = new JavaSparkContext(conf);
         MongoClient client = new MongoClient("172.19.241.171");
         MongoDatabase database = client.getDatabase("general");

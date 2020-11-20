@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 public final class HotCount {
+    static int topNum = 20;
 
     public static void main(String[] args) throws InterruptedException {
         SparkConf conf = new SparkConf().setMaster("spark://master:7077").setAppName("HotCount");
@@ -42,11 +43,11 @@ public final class HotCount {
             SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
             String[] parts = df.format(new Date()).split(":");
             String timeStamp = parts[0] + ":" + parts[1];
-            List<MyTuple2> items = rdd.top(10);
+            List<MyTuple2> items = rdd.top(topNum);
 
             MongoClient client = new MongoClient("172.19.241.171");
-            MongoDatabase database = client.getDatabase("hot");
-            MongoCollection<Document> collection = database.getCollection("cate_hot");
+            MongoDatabase database = client.getDatabase("general");
+            MongoCollection<Document> collection = database.getCollection("hot");
 
             if (items.size() > 0) {
                 List<Document> jsons = new LinkedList<>();
@@ -93,17 +94,17 @@ public final class HotCount {
         JavaDStream<CateHostHot> cate_top_hot = cate_host_hot.map(new Function<Tuple2<String, List<Tuple2<String, Integer>>>, CateHostHot>() {
             @Override
             public CateHostHot call(Tuple2<String, List<Tuple2<String, Integer>>> stringListTuple2) throws Exception {
-                List<Tuple2<String, Integer>> top10 = new LinkedList<>();
+                List<Tuple2<String, Integer>> topHosts = new LinkedList<>();
                 List<Tuple2<String, Integer>> all = stringListTuple2._2;
                 all.sort((o1, o2) -> o2._2 - o1._2);
                 int i = 0;
-                while (top10.size() < 10 && i < all.size()) {
-                    if (top10.size() == 0 || (!all.get(i)._1.equals(top10.get(top10.size() - 1)._1))) {
-                        top10.add(all.get(i));
+                while (topHosts.size() < topNum && i < all.size()) {
+                    if (topHosts.size() == 0 || (!all.get(i)._1.equals(topHosts.get(topHosts.size() - 1)._1))) {
+                        topHosts.add(all.get(i));
                     }
                     i++;
                 }
-                return new CateHostHot(new Tuple2<>(stringListTuple2._1, top10));
+                return new CateHostHot(new Tuple2<>(stringListTuple2._1, topHosts));
             }
         });
 
@@ -113,7 +114,7 @@ public final class HotCount {
                 String[] parts = df.format(new Date()).split(":");
                 String timeStamp = parts[0] + ":" + parts[1];
                 String cateName = item.t._1;
-                MongoCollection<Document> collection = new MongoClient("172.19.241.171").getDatabase("cate_top_host").getCollection(cateName);
+                MongoCollection<Document> collection = new MongoClient("172.19.241.171").getDatabase("categories").getCollection(cateName);
                 List<Document> list = new LinkedList<>();
                 item.t._2.forEach(i -> {
                     list.add(new Document("host", i._1).append("hot", i._2));

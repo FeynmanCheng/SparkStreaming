@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>groupId</groupId>
-    <artifactId>graph</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>homework</artifactId>
+    <version>1.0</version>
 
     <build>
         <plugins>
