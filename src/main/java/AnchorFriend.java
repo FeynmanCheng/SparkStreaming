@@ -1,4 +1,3 @@
-import scala.Int;
 import scala.Serializable;
 
 public class AnchorFriend implements Serializable {
